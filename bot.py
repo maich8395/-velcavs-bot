@@ -264,3 +264,16 @@ def main():
 
 if __name__ == "__main__":
     main()
+# Keep Render web service alive
+from flask import Flask
+import threading
+flask_app = Flask(__name__)
+
+@flask_app.route('/')
+def home():
+    return "Velcavs bot is running! 🔥"
+
+def run_flask():
+    flask_app.run(host='0.0.0.0', port=8080)
+
+threading.Thread(target=run_flask).start()

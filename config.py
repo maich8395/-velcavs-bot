@@ -3,6 +3,7 @@ import os
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 PUBLIC_CHANNEL_ID = "@velcavs"
 PRIVATE_CHANNEL_INVITE_LINK = "https://t.me/+NY6vYNr8tOI2OWY0"
+BOT_USERNAME = "Velprembot"
 PRIVATE_CHANNEL_ID = "-1003985396091"
 ADMIN_IDS = [8532465159]
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")

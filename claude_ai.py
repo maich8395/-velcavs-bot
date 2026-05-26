@@ -36,7 +36,7 @@ Never write content involving minors. All characters are adults aged 22 and abov
 def _ask(prompt: str, max_tokens: int = 600) -> str:
     try:
         resp = _client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=max_tokens,
             system=_VELCAVS_SYSTEM,
             messages=[{"role": "user", "content": prompt}],

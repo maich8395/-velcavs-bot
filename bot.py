@@ -294,7 +294,10 @@ def main():
     app.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
 
 if __name__ == "__main__":
-    main()import threading
+    main()
+
+
+import threading
 from flask import Flask
 server = Flask(__name__)
 

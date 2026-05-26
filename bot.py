@@ -504,7 +504,10 @@ def main():
         replace_existing=True,
     )
 
-    scheduler.start()
+    import asyncio
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+scheduler.start()
     logger.info(
         "Velcavs bot running 🔥 — "
         f"Stories every {config.AUTO_POST_INTERVAL_HOURS}h, "

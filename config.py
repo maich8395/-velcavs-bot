@@ -1,12 +1,12 @@
 import os
 
-BOT_TOKEN = os.environ.get("8960555819:AAHPVlLQHRRWsO2iwWiao30CO5aY8hjM6cs", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 PUBLIC_CHANNEL_ID = "@velcavs"
-PRIVATE_CHANNEL_ID = "-100XXXXXXXXXX"
 PRIVATE_CHANNEL_INVITE_LINK = "https://t.me/+NY6vYNr8tOI2OWY0"
-ADMIN_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "8532465159").strip("[]").split(",")]
-ANTHROPIC_API_KEY = os.environ.get("sk-ant-api03-RtT...5gAA", "")
-MPESA_TILL = os.environ.get("5678732", "")
+PRIVATE_CHANNEL_ID = "-100XXXXXXXXXX"
+ADMIN_IDS = [8532465159]
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+MPESA_PAYBILL = os.environ.get("MPESA_PAYBILL", "5678732")
 MPESA_ACCOUNT_NAME = "VELCAVS VIP"
 MPESA_CONSUMER_KEY = ""
 MPESA_CONSUMER_SECRET = ""

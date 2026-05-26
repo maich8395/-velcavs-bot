@@ -3,19 +3,21 @@
 # ============================================================
 
 # ─── Telegram ────────────────────────────────────────────────
-BOT_TOKEN = "8960555819:AAHPVlLQHRRWsO2iwWiao30CO5aY8hjM6cs"          # From @BotFather — never share this
+BOT_TOKEN = os.environ.get("8960555819:AAHPVlLQHRRWsO2iwWiao30CO5aY8hjM6cs")         # From @BotFather — never share this
 
 PUBLIC_CHANNEL_ID  = "@velcavs"
 PRIVATE_CHANNEL_ID = "-100XXXXXXXXXX"      # Numeric ID of your private channel
 PRIVATE_CHANNEL_INVITE_LINK = "https://t.me/+NY6vYNr8tOI2OWY0"
 
-ADMIN_IDS = [8532465159]   # Your Telegram numeric user ID from @userinfobot
+ADMIN_IDS = {int(os.environ.get("ADMIN_IDS", "8532465159").strip("
+
+[]"))}  # Your Telegram numeric user ID from @userinfobot
 
 # ─── Anthropic / Claude ──────────────────────────────────────
-ANTHROPIC_API_KEY = "sk-ant-api03-RtT...5gAA"
+ANTHROPIC_API_KEY = os.environ.get("sk-ant-api03-RtT...5gAA")
 
 # ─── M-Pesa ──────────────────────────────────────────────────
-MPESA_PAYBILL      = "5678732"
+MPESA_TILL NUMBER= os.environ.get("5678732")
 MPESA_ACCOUNT_NAME = "Joseph Gichimu"
 
 # Daraja API — fill when ready for real STK push

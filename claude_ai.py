@@ -331,17 +331,6 @@ def expired_message(first_name: str, plan_label: str) -> str:
     )
     return text or "👑 VIP EXCLUSIVE\n\nFull story inaandikwa... check back soon!"
 
-def generate_premium_story(category: str = None) -> str:
-    if not category or category not in _STORY_FNS:
-        category = random.choice(list(_STORY_FNS.keys()))
-    text = _ask(
-        f"Write a FULL, LONG, uncut {category.replace('_',' ')} story for Velcavs VIP premium channel. "
-        f"This is the complete version that public channel subscribers are teased about. "
-        f"400-500 words. English-Kiswahili-Sheng mix. "
-        f"More detailed, more emotional, more sensual than the teaser. "
-        f"Include dialogue, inner thoughts, vivid descriptions. "
-        f"End with a satisfying but thought-provoking conclusion. "
-        f"Start with: 👑 VIP EXCLUSIVE — Full Story\n\n",
-        max_tokens=800,
-    )
-    return text or "👑 VIP EXCLUSIVE\n\nFull story inaandikwa... check back soon!"
+def generate_premium_story(category=None):
+    story = generate_story(category)
+    return "👑 VIP EXCLUSIVE — Full Story\n\n" + story

@@ -459,4 +459,9 @@ async def run_bot():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_bot())
+    try:
+        main()
+    except Exception as e:
+        logger.error(f"Bot crashed with error: {e}")
+        import traceback
+        traceback.print_exc()

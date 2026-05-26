@@ -262,18 +262,36 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_random_story, pattern="^random_story$"))
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
+def main():
+    db.init_db()
+    app = Application.builder().token(config.BOT_TOKEN).post_init(post_init).build()
+    conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(cb_join_premium, pattern="^join_premium$")],
+        states={
+            CHOOSING_PLAN: [CallbackQueryHandler(cb_plan_selected, pattern="^plan_")],
+            ENTERING_PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone),
+                CallbackQueryHandler(cb_join_premium, pattern="^join_premium$"),
+            ],
+            AWAITING_CONFIRMATION: [
+                CallbackQueryHandler(cb_confirm_payment, pattern="^confirm_payment$"),
+                CallbackQueryHandler(cb_join_premium, pattern="^join_premium$"),
+            ],
+        },
+        fallbacks=[CommandHandler("start", cmd_start), CallbackQueryHandler(cb_cancel, pattern="^cancel$")],
+        per_user=True, per_chat=True, allow_reentry=True,
+    )
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("story", cmd_story))
+    app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("plans", cmd_plans))
+    app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(CommandHandler("post", cmd_post))
+    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
+    app.add_handler(conv)
+    app.add_handler(CallbackQueryHandler(cb_random_story, pattern="^random_story$"))
+    app.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
+
 if __name__ == "__main__":
     main()
-# Keep Render web service alive
-from flask import Flask
-import threading
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def home():
-    return "Velcavs bot is running! 🔥"
-
-def run_flask():
-    flask_app.run(host='0.0.0.0', port=8080)
-
-threading.Thread(target=run_flask).start()

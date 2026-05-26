@@ -22,7 +22,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 
 import config
 import database as db

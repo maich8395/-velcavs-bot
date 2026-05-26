@@ -1,7 +1,5 @@
 # ============================================================
 #  bot.py  —  Velcavs Premium Channel Bot
-#  Auto-posts romantic stories, manages M-Pesa subscriptions
-#  Run:  python bot.py
 # ============================================================
 
 import asyncio
@@ -29,7 +27,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import config
 import database as db
 import claude_ai as ai
-from mpesa import validate_kenyan_phone, stk_push
+from mpesa import validate_kenyan_phone
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -37,18 +35,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ─── Conversation states ─────────────────────────────────────
 CHOOSING_PLAN, ENTERING_PHONE, AWAITING_CONFIRMATION = range(3)
-
-# Story category rotation tracker
 _last_category_index = 0
 
 
-# ═══════════════════════════════════════════════════════════════
-#  KEYBOARDS
-# ═══════════════════════════════════════════════════════════════
-
-def plans_keyboard() -> InlineKeyboardMarkup:
+def plans_keyboard():
     rows = []
     for key, plan in config.PLANS.items():
         rows.append([InlineKeyboardButton(
@@ -58,47 +49,41 @@ def plans_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def join_keyboard(label: str = "🔥 Join VIP — Soma Full Stories") -> InlineKeyboardMarkup:
+def join_keyboard(label="🔥 Join VIP — Soma Full Stories"):
     return InlineKeyboardMarkup([[
         InlineKeyboardButton(label, callback_data="join_premium")
     ]])
 
 
-def renew_keyboard() -> InlineKeyboardMarkup:
+def renew_keyboard():
     return InlineKeyboardMarkup([[
         InlineKeyboardButton("🔄 Renew My VIP Access", callback_data="join_premium")
     ]])
 
 
-def access_keyboard() -> InlineKeyboardMarkup:
+def access_keyboard():
     return InlineKeyboardMarkup([[
         InlineKeyboardButton("🔐 Enter Velcavs VIP Channel", url=config.PRIVATE_CHANNEL_INVITE_LINK)
     ]])
 
 
-def story_request_keyboard() -> InlineKeyboardMarkup:
-    """Keyboard shown after a story — request more or join VIP."""
+def story_request_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📖 Another Story", callback_data="random_story")],
         [InlineKeyboardButton("🔥 Join VIP for Full Stories", callback_data="join_premium")],
     ])
 
 
-# ═══════════════════════════════════════════════════════════════
-#  USER COMMANDS
-# ═══════════════════════════════════════════════════════════════
-
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.init_db()
     user = update.effective_user
-    msg  = ai.welcome_message(user.first_name)
+    msg = ai.welcome_message(user.first_name)
     await update.message.reply_text(
         msg, reply_markup=join_keyboard("🔥 Jiunge VIP — Soma Stories Zote")
     )
 
 
 async def cmd_story(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Send a random public story teaser."""
     await update.message.reply_text("⏳ Naandika story yako... ngoja kidogo...")
     story = ai.generate_story()
     await update.message.reply_text(story, reply_markup=story_request_keyboard())
@@ -106,7 +91,7 @@ async def cmd_story(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    sub  = db.get_active_subscriber(user.id)
+    sub = db.get_active_subscriber(user.id)
     if not sub:
         old = db.get_subscriber(user.id)
         if old:
@@ -117,20 +102,19 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.message.reply_text(
-                f"Hujoin VIP bado, {user.first_name}! 😮\n"
-                "Jiunge sasa upate full stories bila cuts 👇",
+                f"Hujoin VIP bado, {user.first_name}!\nJiunge sasa upate full stories 👇",
                 reply_markup=join_keyboard(),
             )
         return
 
-    expiry    = datetime.fromisoformat(sub["expiry_date"])
+    expiry = datetime.fromisoformat(sub["expiry_date"])
     days_left = (expiry - datetime.now()).days
-    plan_cfg  = config.PLANS.get(sub["plan"], {})
-    warning   = ""
+    plan_cfg = config.PLANS.get(sub["plan"], {})
+    warning = ""
     if days_left <= 1:
-        warning = "\n\n⚠️ *Renew haraka usipoteze access!*"
+        warning = "\n\n⚠️ Renew haraka usipoteze access!"
     elif days_left <= 3:
-        warning = f"\n\n🔔 *{days_left} days* zimebaki — renew soon!"
+        warning = f"\n\n🔔 {days_left} days zimebaki — renew soon!"
 
     await update.message.reply_text(
         f"📊 *Velcavs VIP Status*\n\n"
@@ -147,7 +131,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📖 *Velcavs Bot Commands*\n\n"
         "/start  — Welcome message\n"
-        "/story  — Get a random story teaser\n"
+        "/story  — Get a random story\n"
         "/status — Check your VIP subscription\n"
         "/plans  — See subscription plans\n"
         "/help   — This message",
@@ -163,11 +147,7 @@ async def cmd_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ═══════════════════════════════════════════════════════════════
-#  ADMIN COMMANDS
-# ═══════════════════════════════════════════════════════════════
-
-def is_admin(uid: int) -> bool:
+def is_admin(uid):
     return uid in config.ADMIN_IDS
 
 
@@ -181,24 +161,22 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ) or "  Hakuna bado"
     await update.message.reply_text(
         f"📊 *Velcavs Stats*\n\n"
-        f"👥 Total subscribers: {s['total']}\n"
+        f"👥 Total: {s['total']}\n"
         f"✅ Active: {s['active']}\n"
         f"❌ Expired: {s['expired']}\n\n"
         f"💰 *Revenue*\n"
-        f"  Leo:       KSH {s['revenue_today']:,}\n"
-        f"  Wiki hii:  KSH {s['revenue_week']:,}\n"
-        f"  Mwezi huu: KSH {s['revenue_month']:,}\n\n"
-        f"📋 *Plans Breakdown*\n{breakdown}",
+        f"  Leo: KSH {s['revenue_today']:,}\n"
+        f"  Wiki: KSH {s['revenue_week']:,}\n"
+        f"  Mwezi: KSH {s['revenue_month']:,}\n\n"
+        f"📋 *Plans*\n{breakdown}",
         parse_mode="Markdown",
     )
 
 
 async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin: /post [category] — manually trigger a story post."""
     if not is_admin(update.effective_user.id):
         return
-    category = context.args[0] if context.args else None
-    await update.message.reply_text("📝 Naandika story... ngoja...")
+    await update.message.reply_text("📝 Naandika story...")
     content = ai.auto_post_story_with_promo()
     try:
         await context.bot.send_message(
@@ -212,7 +190,6 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin: /broadcast <message> — post custom message to public channel."""
     if not is_admin(update.effective_user.id):
         return
     text = " ".join(context.args)
@@ -224,12 +201,8 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=text,
         reply_markup=join_keyboard(),
     )
-    await update.message.reply_text("✅ Broadcast iметumwa!")
+    await update.message.reply_text("✅ Broadcast imetumwa!")
 
-
-# ═══════════════════════════════════════════════════════════════
-#  SUBSCRIPTION CONVERSATION
-# ═══════════════════════════════════════════════════════════════
 
 async def cb_join_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -243,7 +216,7 @@ async def cb_join_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cb_plan_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query    = update.callback_query
+    query = update.callback_query
     await query.answer()
     plan_key = query.data.replace("plan_", "")
     if plan_key not in config.PLANS:
@@ -262,7 +235,7 @@ async def cb_plan_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.text.strip()
-    user  = update.effective_user
+    user = update.effective_user
     if not validate_kenyan_phone(phone):
         await update.message.reply_text(
             "❌ Namba si sahihi. Ingiza namba ya M-Pesa kama *07XXXXXXXX*",
@@ -289,10 +262,10 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cb_confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Inaprocess... ⏳")
-    user     = query.from_user
+    user = query.from_user
     plan_key = context.user_data.get("plan_key")
-    plan     = context.user_data.get("plan")
-    phone    = context.user_data.get("phone", "unknown")
+    plan = context.user_data.get("plan")
+    phone = context.user_data.get("phone", "unknown")
     if not plan_key or not plan:
         await query.edit_message_text("⚠️ Session imeexpire. Anza tena na /start")
         return ConversationHandler.END
@@ -329,7 +302,6 @@ async def cb_confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ConversationHandler.END
 
 
-# ─── Random story callback ────────────────────────────────────
 async def cb_random_story(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Naandika story... ✍️")
@@ -349,18 +321,11 @@ async def cb_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-# ═══════════════════════════════════════════════════════════════
-#  SCHEDULER JOBS
-# ═══════════════════════════════════════════════════════════════
-
 async def job_auto_post(bot):
-    """Post a story + promo to public channel every 3 hours."""
     global _last_category_index
     categories = config.STORY_CATEGORIES
-    category   = categories[_last_category_index % len(categories)]
+    category = categories[_last_category_index % len(categories)]
     _last_category_index += 1
-
-    logger.info(f"Auto-posting category: {category}")
     try:
         content = ai.auto_post_story_with_promo()
         await bot.send_message(
@@ -368,16 +333,12 @@ async def job_auto_post(bot):
             text=content,
             reply_markup=join_keyboard("🔥 Jiunge VIP — Soma Full Version"),
         )
-        logger.info("Auto-post sent successfully.")
+        logger.info(f"Auto-post sent: {category}")
     except Exception as exc:
         logger.error(f"Auto-post failed: {exc}")
 
 
 async def job_standalone_promo(bot):
-    """
-    Post a pure promo (no story) at the halfway point between story posts.
-    Fires 1.5 hours after each story post.
-    """
     try:
         promo = ai.promo_caption()
         await bot.send_message(
@@ -385,18 +346,17 @@ async def job_standalone_promo(bot):
             text=promo,
             reply_markup=join_keyboard("💎 Jiunge Velcavs VIP Sasa"),
         )
-        logger.info("Standalone promo sent.")
+        logger.info("Promo sent.")
     except Exception as exc:
-        logger.error(f"Promo post failed: {exc}")
+        logger.error(f"Promo failed: {exc}")
 
 
 async def job_check_subscriptions(bot):
-    """Warn expiring, deactivate expired."""
     for sub in db.get_expiring_soon(hours=24):
-        expiry     = datetime.fromisoformat(sub["expiry_date"])
+        expiry = datetime.fromisoformat(sub["expiry_date"])
         hours_left = max(0, int((expiry - datetime.now()).total_seconds() / 3600))
-        plan_cfg   = config.PLANS.get(sub["plan"], {})
-        msg        = ai.expiry_warning(
+        plan_cfg = config.PLANS.get(sub["plan"], {})
+        msg = ai.expiry_warning(
             sub["first_name"], plan_cfg.get("label", sub["plan"]), hours_left
         )
         try:
@@ -410,7 +370,7 @@ async def job_check_subscriptions(bot):
 
     for sub in db.get_expired_subscribers():
         plan_cfg = config.PLANS.get(sub["plan"], {})
-        msg      = ai.expired_message(sub["first_name"], plan_cfg.get("label", sub["plan"]))
+        msg = ai.expired_message(sub["first_name"], plan_cfg.get("label", sub["plan"]))
         try:
             await bot.send_message(
                 chat_id=sub["user_id"], text=msg,
@@ -419,14 +379,9 @@ async def job_check_subscriptions(bot):
         except Exception:
             pass
         db.deactivate_subscriber(sub["user_id"])
-        logger.info(f"Deactivated: {sub['user_id']}")
 
 
-# ═══════════════════════════════════════════════════════════════
-#  MAIN
-# ═══════════════════════════════════════════════════════════════
-
-def main():
+async def run_bot():
     db.init_db()
     app = Application.builder().token(config.BOT_TOKEN).build()
 
@@ -442,7 +397,7 @@ def main():
             ],
             AWAITING_CONFIRMATION: [
                 CallbackQueryHandler(cb_confirm_payment, pattern="^confirm_payment$"),
-                CallbackQueryHandler(cb_join_premium,    pattern="^join_premium$"),
+                CallbackQueryHandler(cb_join_premium, pattern="^join_premium$"),
             ],
         },
         fallbacks=[
@@ -454,67 +409,54 @@ def main():
         allow_reentry=True,
     )
 
-    app.add_handler(CommandHandler("start",     cmd_start))
-    app.add_handler(CommandHandler("story",     cmd_story))
-    app.add_handler(CommandHandler("status",    cmd_status))
-    app.add_handler(CommandHandler("plans",     cmd_plans))
-    app.add_handler(CommandHandler("help",      cmd_help))
-    app.add_handler(CommandHandler("stats",     cmd_stats))
-    app.add_handler(CommandHandler("post",      cmd_post))
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("story", cmd_story))
+    app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("plans", cmd_plans))
+    app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(CommandHandler("post", cmd_post))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(conv)
     app.add_handler(CallbackQueryHandler(cb_random_story, pattern="^random_story$"))
 
     async def post_init(application: Application):
         await application.bot.set_my_commands([
-            BotCommand("start",  "Karibu Velcavs!"),
-            BotCommand("story",  "Pata story ya bure"),
+            BotCommand("start", "Karibu Velcavs!"),
+            BotCommand("story", "Pata story ya bure"),
             BotCommand("status", "Check VIP subscription yako"),
-            BotCommand("plans",  "Ona plan zote za VIP"),
-            BotCommand("help",   "Msaada & commands"),
+            BotCommand("plans", "Ona plan zote za VIP"),
+            BotCommand("help", "Msaada & commands"),
         ])
+        scheduler = AsyncIOScheduler(timezone="Africa/Nairobi")
+        scheduler.add_job(
+            lambda: asyncio.create_task(job_auto_post(application.bot)),
+            trigger="interval",
+            hours=config.AUTO_POST_INTERVAL_HOURS,
+            id="auto_post",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            lambda: asyncio.create_task(job_standalone_promo(application.bot)),
+            trigger="interval",
+            hours=3,
+            minutes=90,
+            id="promo_post",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            lambda: asyncio.create_task(job_check_subscriptions(application.bot)),
+            trigger="interval",
+            hours=config.EXPIRY_CHECK_INTERVAL_HOURS,
+            id="check_subs",
+            replace_existing=True,
+        )
+        scheduler.start()
+        logger.info("Velcavs bot running 🔥")
 
     app.post_init = post_init
-
-    scheduler = AsyncIOScheduler(timezone="Africa/Nairobi")
-
-    # Story post every 3 hours
-    scheduler.add_job(
-        lambda: asyncio.create_task(job_auto_post(app.bot)),
-        trigger="interval",
-        hours=config.AUTO_POST_INTERVAL_HOURS,
-        id="auto_post",
-        replace_existing=True,
-    )
-    # Pure promo halfway between story posts (every 3h offset by 1.5h)
-    scheduler.add_job(
-        lambda: asyncio.create_task(job_standalone_promo(app.bot)),
-        trigger="interval",
-        hours=config.AUTO_POST_INTERVAL_HOURS,
-        minutes=90,
-        id="promo_post",
-        replace_existing=True,
-    )
-    # Expiry check every hour
-    scheduler.add_job(
-        lambda: asyncio.create_task(job_check_subscriptions(app.bot)),
-        trigger="interval",
-        hours=config.EXPIRY_CHECK_INTERVAL_HOURS,
-        id="check_subs",
-        replace_existing=True,
-    )
-
-    import asyncio
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-scheduler.start()
-    logger.info(
-        "Velcavs bot running 🔥 — "
-        f"Stories every {config.AUTO_POST_INTERVAL_HOURS}h, "
-        f"Promos every {config.AUTO_POST_INTERVAL_HOURS}h (offset 1.5h)"
-    )
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    await app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(run_bot())

@@ -294,4 +294,12 @@ def main():
     app.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
 
 if __name__ == "__main__":
-    main()
+    main()import threading
+from flask import Flask
+server = Flask(__name__)
+
+@server.route('/')
+def home():
+    return "Velcavs bot is running! 🔥"
+
+threading.Thread(target=lambda: server.run(host='0.0.0.0', port=8080)).start()

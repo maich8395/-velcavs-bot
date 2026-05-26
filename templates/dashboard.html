@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Premium Channel Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg:        #0b0f14;
+    --surface:   #131820;
+    --surface2:  #1a2130;
+    --border:    rgba(255,255,255,0.07);
+    --border2:   rgba(255,255,255,0.13);
+    --text:      #e8edf5;
+    --muted:     #6b7a94;
+    --accent:    #00e5a0;
+    --accent2:   #0091ff;
+    --danger:    #ff4d6d;
+    --warn:      #ffb800;
+    --radius:    12px;
+    --radius-sm: 7px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .shell { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 28px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    flex-shrink: 0;
+  }
+  .logo {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover, .nav-item.active {
+    background: rgba(0,229,160,.07);
+    color: var(--accent);
+  }
+  .nav-icon { font-size: 15px; }
+
+  .main {
+    flex: 1;
+    padding: 32px 36px;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .page-title { font-size: 22px; font-weight: 700; }
+  .page-sub   { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Stat cards ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .stat-card:hover { border-color: var(--border2); }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--card-accent, var(--accent));
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    font-family: 'DM Mono', monospace;
+  }
+  .stat-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .stat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    margin-top: 6px;
+  }
+  .badge-up   { background: rgba(0,229,160,.12); color: var(--accent); }
+  .badge-warn { background: rgba(255,184,0,.12); color: var(--warn); }
+  .badge-red  { background: rgba(255,77,109,.12); color: var(--danger); }
+
+  /* ── Charts ── */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 28px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+  }
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 200px;
+  }
+
+  /* ── Plans ── */
+  .plans-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .plan-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    text-align: center;
+  }
+  .plan-emoji { font-size: 22px; }
+  .plan-name  { font-size: 13px; font-weight: 600; margin: 6px 0 3px; }
+  .plan-price { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  .plan-total { font-size: 24px; font-weight: 700; font-family: 'DM Mono', monospace; }
+  .plan-active { font-size: 11px; color: var(--accent); margin-top: 4px; }
+
+  /* ── Tables ── */
+  .table-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+  .table-title { font-size: 13px; font-weight: 600; }
+  .tab-group { display: flex; gap: 4px; }
+  .tab-btn {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .tab-btn.active, .tab-btn:hover {
+    background: rgba(0,229,160,.08);
+    border-color: rgba(0,229,160,.3);
+    color: var(--accent);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 22px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    font-size: 13px;
+    padding: 12px 22px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .status-pill.active  { background: rgba(0,229,160,.12); color: var(--accent); }
+  .status-pill.expired { background: rgba(255,77,109,.12); color: var(--danger); }
+  .status-pill::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  .amount-cell { font-family: 'DM Mono', monospace; font-size: 13px; }
+
+  /* ── Loader ── */
+  .loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: var(--muted);
+    font-size: 13px;
+    gap: 10px;
+  }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Live dot ── */
+  .live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s infinite; }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { padding: 20px; }
+    .charts-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      VIP BOT
+    </div>
+    <button class="nav-item active" onclick="showSection('overview')">
+      <span class="nav-icon">⊞</span> Overview
+    </button>
+    <button class="nav-item" onclick="showSection('subscribers')">
+      <span class="nav-icon">◎</span> Subscribers
+    </button>
+    <button class="nav-item" onclick="showSection('payments')">
+      <span class="nav-icon">⬡</span> Payments
+    </button>
+    <div style="flex:1"></div>
+    <div class="live-indicator">
+      <div class="live-dot"></div> Live data
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">Channel Dashboard</div>
+        <div class="page-sub" id="last-updated">Loading...</div>
+      </div>
+      <button class="refresh-btn" onclick="loadAll()">
+        ↻ Refresh
+      </button>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="loader"><div class="spinner"></div> Loading stats…</div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row" id="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Revenue (last 14 days) · KSH</div>
+        <div class="chart-wrap">
+          <canvas id="revenueChart" role="img" aria-label="Revenue chart for last 14 days"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">New subscribers (last 14 days)</div>
+        <div class="chart-wrap">
+          <canvas id="subsChart" role="img" aria-label="Subscribers chart for last 14 days"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plan Breakdown -->
+    <div class="table-section" style="margin-bottom:18px;padding:20px 22px;">
+      <div class="table-title" style="margin-bottom:14px;">Plans breakdown</div>
+      <div class="plans-row" id="plans-row">
+        <div class="loader"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Subscribers / Payments table -->
+    <div class="table-section" id="data-table">
+      <div class="table-header">
+        <div class="table-title" id="table-label">Recent subscribers</div>
+        <div class="tab-group">
+          <button class="tab-btn active" onclick="switchTab('subscribers', this)">Subscribers</button>
+          <button class="tab-btn" onclick="switchTab('payments', this)">Payments</button>
+        </div>
+      </div>
+      <div id="table-body">
+        <div class="loader"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const TOKEN = '{{ token }}';
+const headers = { 'X-Dashboard-Token': TOKEN };
+let revenueChart = null;
+let subsChart    = null;
+let currentTab   = 'subscribers';
+
+function api(path) {
+  return fetch(path, { headers }).then(r => r.json());
+}
+
+async function loadStats() {
+  const d = await api('/api/overview');
+  const grid = document.getElementById('stats-grid');
+  grid.innerHTML = `
+    <div class="stat-card" style="--card-accent:#00e5a0">
+      <div class="stat-label">Total subscribers</div>
+      <div class="stat-value">${d.total_subscribers}</div>
+      <div class="stat-sub">All time</div>
+    </div>
+    <div class="stat-card" style="--card-accent:#00e5a0">
+      <div class="stat-label">Active now</div>
+      <div class="stat-value" style="color:var(--accent)">${d.active_subscribers}</div>
+      <div class="stat-badge badge-up">✓ LIVE</div>
+    </div>
+    <div class="stat-card" style="--card-accent:#ff4d6d">
+      <div class="stat-label">Expired</div>
+      <div class="stat-value" style="color:var(--danger)">${d.expired_subscribers}</div>
+      <div class="stat-sub">Total expired</div>
+    </div>
+    <div class="stat-card" style="--card-accent:#0091ff">
+      <div class="stat-label">New today</div>
+      <div class="stat-value" style="color:var(--accent2)">${d.new_today}</div>
+      <div class="stat-sub">Joined today</div>
+    </div>
+    <div class="stat-card" style="--card-accent:#ffb800">
+      <div class="stat-label">Expiring soon</div>
+      <div class="stat-value" style="color:var(--warn)">${d.expiring_soon}</div>
+      <div class="stat-sub">Within 24 hours</div>
+    </div>
+    <div class="stat-card" style="--card-accent:#00e5a0">
+      <div class="stat-label">Total payments</div>
+      <div class="stat-value">${d.total_payments}</div>
+      <div class="stat-sub">Transactions</div>
+    </div>
+    <div class="stat-card" style="--card-accent:#00e5a0">
+      <div class="stat-label">Revenue today</div>
+      <div class="stat-value" style="font-size:20px">KSH ${d.revenue_today.toLocaleString()}</div>
+      <div class="stat-sub">Today's earnings</div>
+    </div>
+    <div class="stat-card" style="--card-accent:#0091ff">
+      <div class="stat-label">Revenue this week</div>
+      <div class="stat-value" style="font-size:20px">KSH ${d.revenue_week.toLocaleString()}</div>
+      <div class="stat-sub">7-day total</div>
+    </div>
+    <div class="stat-card" style="--card-accent:#0091ff">
+      <div class="stat-label">Revenue this month</div>
+      <div class="stat-value" style="font-size:18px">KSH ${d.revenue_month.toLocaleString()}</div>
+      <div class="stat-sub">Monthly total</div>
+    </div>
+  `;
+  document.getElementById('last-updated').textContent =
+    'Last updated: ' + new Date().toLocaleTimeString('en-KE');
+}
+
+async function loadCharts() {
+  const [rev, subs] = await Promise.all([
+    api('/api/revenue-chart'),
+    api('/api/subscribers-chart'),
+  ]);
+
+  const chartOpts = (color) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        grid: { color: 'rgba(255,255,255,0.04)' },
+        ticks: { color: '#6b7a94', font: { size: 10, family: 'DM Mono' }, autoSkip: false, maxRotation: 45 }
+      },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.04)' },
+        ticks: { color: '#6b7a94', font: { size: 10, family: 'DM Mono' } },
+        beginAtZero: true
+      }
+    }
+  });
+
+  if (revenueChart) revenueChart.destroy();
+  revenueChart = new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+      labels: rev.labels,
+      datasets: [{
+        label: 'KSH',
+        data: rev.values,
+        backgroundColor: 'rgba(0,229,160,0.18)',
+        borderColor: '#00e5a0',
+        borderWidth: 1.5,
+        borderRadius: 4,
+      }]
+    },
+    options: chartOpts('#00e5a0')
+  });
+
+  if (subsChart) subsChart.destroy();
+  subsChart = new Chart(document.getElementById('subsChart'), {
+    type: 'line',
+    data: {
+      labels: subs.labels,
+      datasets: [{
+        label: 'Subscribers',
+        data: subs.values,
+        borderColor: '#0091ff',
+        backgroundColor: 'rgba(0,145,255,0.08)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#0091ff',
+        tension: 0.35,
+        fill: true,
+      }]
+    },
+    options: chartOpts('#0091ff')
+  });
+}
+
+async function loadPlans() {
+  const plans = await api('/api/plan-breakdown');
+  const row = document.getElementById('plans-row');
+  if (!plans.length) {
+    row.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px">No data yet</div>';
+    return;
+  }
+  row.innerHTML = plans.map(p => `
+    <div class="plan-card">
+      <div class="plan-emoji">${p.emoji}</div>
+      <div class="plan-name">${p.label}</div>
+      <div class="plan-price">KSH ${p.price.toLocaleString()}</div>
+      <div class="plan-total">${p.total}</div>
+      <div class="plan-active">${p.active} active</div>
+    </div>
+  `).join('');
+}
+
+async function loadSubscribers() {
+  const subs = await api('/api/recent-subscribers');
+  if (!subs.length) {
+    document.getElementById('table-body').innerHTML =
+      '<div class="loader">No subscribers yet</div>';
+    return;
+  }
+  document.getElementById('table-body').innerHTML = `
+    <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Plan</th>
+          <th>Amount</th>
+          <th>Joined</th>
+          <th>Expires</th>
+          <th>Days left</th>
+          <th>Status</th>
+          <th>M-Pesa</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${subs.map(s => `
+          <tr>
+            <td>
+              <div style="font-weight:500">${s.name}</div>
+              <div style="font-size:11px;color:var(--muted)">${s.username}</div>
+            </td>
+            <td>${s.emoji} ${s.plan}</td>
+            <td class="amount-cell">KSH ${(s.amount||0).toLocaleString()}</td>
+            <td style="color:var(--muted)">${s.paid_at}</td>
+            <td style="color:var(--muted)">${s.expires}</td>
+            <td style="font-family:'DM Mono',monospace">${s.days_left >= 0 ? s.days_left + 'd' : '—'}</td>
+            <td><span class="status-pill ${s.status}">${s.status}</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${s.mpesa}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+}
+
+async function loadPayments() {
+  const pays = await api('/api/recent-payments');
+  if (!pays.length) {
+    document.getElementById('table-body').innerHTML =
+      '<div class="loader">No payments yet</div>';
+    return;
+  }
+  document.getElementById('table-body').innerHTML = `
+    <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Plan</th>
+          <th>Amount</th>
+          <th>Phone</th>
+          <th>M-Pesa code</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${pays.map(p => `
+          <tr>
+            <td style="color:var(--muted);font-family:'DM Mono',monospace">#${p.id}</td>
+            <td>
+              <div style="font-weight:500">${p.name}</div>
+              <div style="font-size:11px;color:var(--muted)">${p.username}</div>
+            </td>
+            <td>${p.emoji} ${p.plan}</td>
+            <td class="amount-cell" style="color:var(--accent)">KSH ${(p.amount||0).toLocaleString()}</td>
+            <td style="font-family:'DM Mono',monospace;font-size:12px">${p.phone}</td>
+            <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${p.mpesa}</td>
+            <td style="color:var(--muted);font-size:12px">${p.paid_at}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+}
+
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('table-label').textContent =
+    tab === 'subscribers' ? 'Recent subscribers' : 'Recent payments';
+  document.getElementById('table-body').innerHTML =
+    '<div class="loader"><div class="spinner"></div> Loading…</div>';
+  if (tab === 'subscribers') loadSubscribers();
+  else loadPayments();
+}
+
+function showSection(s) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  event.target.closest('.nav-item').classList.add('active');
+}
+
+async function loadAll() {
+  await Promise.all([loadStats(), loadCharts(), loadPlans()]);
+  if (currentTab === 'subscribers') loadSubscribers();
+  else loadPayments();
+}
+
+loadAll();
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>

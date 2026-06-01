@@ -24,6 +24,11 @@ server = Flask(__name__)
 def home():
     return "Velcavs bot is running!"
 
+
+# ──────────────────────────────────────────
+# KEYBOARDS
+# ──────────────────────────────────────────
+
 def plans_keyboard():
     rows = []
     for key, plan in config.PLANS.items():
@@ -53,6 +58,11 @@ def story_keyboard():
         [InlineKeyboardButton("📖 Another Story", callback_data="random_story")],
         [InlineKeyboardButton("🔥 Join VIP for Full Stories", url=f"https://t.me/{config.BOT_USERNAME}?start=join")],
     ])
+
+
+# ──────────────────────────────────────────
+# COMMANDS
+# ──────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.init_db()
@@ -150,6 +160,11 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text("✅ Broadcast imetumwa!")
 
+
+# ──────────────────────────────────────────
+# CHANNEL POSTING
+# ──────────────────────────────────────────
+
 async def post_to_both_channels(bot):
     try:
         teaser = ai.generate_story()
@@ -174,6 +189,11 @@ async def post_to_both_channels(bot):
     except Exception as exc:
         logger.error(f"Post to channels failed: {exc}")
 
+
+# ──────────────────────────────────────────
+# CONVERSATION FLOW — PLAN SELECTION
+# ──────────────────────────────────────────
+
 async def cb_join_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -195,72 +215,208 @@ async def cb_plan_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ENTERING_PHONE
 
+
+# ──────────────────────────────────────────
+# CONVERSATION FLOW — PHONE & PAYMENT
+# ──────────────────────────────────────────
+
 async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.text.strip()
     user = update.effective_user
     if not validate_kenyan_phone(phone):
         await update.message.reply_text("❌ Namba si sahihi. Ingiza kama 07XXXXXXXX")
         return ENTERING_PHONE
+
     plan = context.user_data["plan"]
     context.user_data["phone"] = phone
-    instructions = ai.payment_instructions(
-        user.first_name,
-        f"{plan['emoji']} {plan['label']}",
-        plan["price"],
-        phone,
-        config.MPESA_PAYBILL
+
+    instructions = (
+        f"✅ *{plan['emoji']} {plan['label']} — KSH {plan['price']:,}*\n\n"
+        f"📲 *Lipa kupitia Till Number:*\n\n"
+        f"🏪 Till Number: *{config.MPESA_TILL}*\n"
+        f"💰 Kiasi: *KSH {plan['price']:,}*\n"
+        f"📱 Kutoka namba: *{phone}*\n\n"
+        f"*Hatua za kulipa:*\n"
+        f"1️⃣ Fungua M-Pesa kwenye simu yako\n"
+        f"2️⃣ Chagua *Lipa na M-Pesa*\n"
+        f"3️⃣ Chagua *Buy Goods and Services*\n"
+        f"4️⃣ Ingiza Till Number: *{config.MPESA_TILL}*\n"
+        f"5️⃣ Ingiza kiasi: *KSH {plan['price']:,}*\n"
+        f"6️⃣ Ingiza PIN yako na confirm\n\n"
+        f"Baada ya kulipa, bonyeza kitufe hapa chini ✅"
     )
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Nililipa — Activate Access Yangu", callback_data="confirm_payment")],
+        [InlineKeyboardButton("✅ Nililipa — Nipigie Confirm", callback_data="confirm_payment")],
         [InlineKeyboardButton("🔙 Badilisha Plan", callback_data="join_premium")]
     ])
-    await update.message.reply_text(instructions, reply_markup=keyboard)
+    await update.message.reply_text(instructions, parse_mode="Markdown", reply_markup=keyboard)
     return AWAITING_CONFIRMATION
+
 
 async def cb_confirm_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer("Inaprocess... ⏳")
+    await query.answer("Imepokewa! Admin anakuconfirm... ⏳")
     user = query.from_user
     plan_key = context.user_data.get("plan_key")
     plan = context.user_data.get("plan")
     phone = context.user_data.get("phone", "unknown")
+
     if not plan_key or not plan:
         await query.edit_message_text("⚠️ Session imeexpire. Anza tena na /start")
         return ConversationHandler.END
+
+    # Tell user to wait — channel link is NOT sent yet
+    await query.edit_message_text(
+        f"⏳ *Asante! Malipo yako yamepokelewa.*\n\n"
+        f"Admin anaverify payment yako sasa hivi.\n"
+        f"Utapata access link ndani ya dakika chache.\n\n"
+        f"📱 Namba: `{phone}`\n"
+        f"📋 Plan: {plan['emoji']} {plan['label']}\n"
+        f"💰 Kiasi: KSH {plan['price']:,}\n\n"
+        f"Subiri kidogo... 🙏",
+        parse_mode="Markdown"
+    )
+
+    # Notify every admin with Approve / Reject buttons
+    for admin_id in config.ADMIN_IDS:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=f"💰 *Payment Confirmation Needed!*\n\n"
+                     f"👤 {user.first_name} (@{user.username or 'no username'})\n"
+                     f"🆔 User ID: `{user.id}`\n"
+                     f"📋 Plan: {plan['emoji']} {plan['label']}\n"
+                     f"💰 Kiasi: KSH {plan['price']:,}\n"
+                     f"🏪 Till: `{config.MPESA_TILL}`\n"
+                     f"📞 Namba: `{phone}`\n\n"
+                     f"✅ Angalia M-Pesa yako kisha approve au reject:",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(
+                            "✅ Approve",
+                            callback_data=f"approve_{user.id}_{plan_key}_{phone}"
+                        ),
+                        InlineKeyboardButton(
+                            "❌ Reject",
+                            callback_data=f"reject_{user.id}"
+                        )
+                    ]
+                ])
+            )
+        except Exception as e:
+            logger.error(f"Could not notify admin {admin_id}: {e}")
+
+    context.user_data.clear()
+    return ConversationHandler.END
+
+
+# ──────────────────────────────────────────
+# ADMIN APPROVAL HANDLERS
+# ──────────────────────────────────────────
+
+async def cb_admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if update.effective_user.id not in config.ADMIN_IDS:
+        await query.answer("❌ Huna ruhusa!", show_alert=True)
+        return
+
+    # callback_data format: approve_USERID_PLANKEY_PHONE
+    parts = query.data.split("_", 3)
+    if len(parts) < 4:
+        await query.edit_message_text("❌ Data haikupatikana. Jaribu tena.")
+        return
+
+    user_id = int(parts[1])
+    plan_key = parts[2]
+    phone = parts[3]
+    plan = config.PLANS.get(plan_key)
+
+    if not plan:
+        await query.edit_message_text("❌ Plan haikupatikana.")
+        return
+
     expiry = datetime.now() + timedelta(days=plan["days"])
+
     db.upsert_subscriber(
-        user_id=user.id,
-        username=user.username or "",
-        first_name=user.first_name,
+        user_id=user_id,
+        username="",
+        first_name="",
         phone=phone,
         plan=plan_key,
         amount=plan["price"],
         expiry=expiry
     )
-    db.log_payment(user.id, plan_key, plan["price"], phone)
-    success = ai.success_message(
-        user.first_name,
-        f"{plan['emoji']} {plan['label']}",
-        expiry.strftime("%d %B %Y")
-    )
+    db.log_payment(user_id, plan_key, plan["price"], phone)
+
+    # Only now send the channel link to the subscriber
+    try:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=f"🎉 *Payment yako imekonfirmiwa!*\n\n"
+                 f"📋 Plan: {plan['emoji']} {plan['label']}\n"
+                 f"📅 Inaisha: {expiry.strftime('%d %B %Y')}\n\n"
+                 f"Karibu Velcavs VIP! 🔥\n"
+                 f"Bonyeza kitufe hapa chini kupata access 👇",
+            parse_mode="Markdown",
+            reply_markup=access_keyboard()
+        )
+        logger.info(f"Access link sent to user {user_id} after admin approval")
+    except Exception as e:
+        logger.error(f"Could not send access to user {user_id}: {e}")
+        await query.edit_message_text(
+            f"⚠️ Approved lakini haikuweza kutuma link kwa user {user_id}. "
+            f"Mtumie manually."
+        )
+        return
+
     await query.edit_message_text(
-        success + f"\n\nExpires: {expiry.strftime('%d %B %Y')}",
-        reply_markup=access_keyboard()
+        f"✅ *Approved!*\n\n"
+        f"Access link imetumwa kwa user `{user_id}`.\n"
+        f"Plan: {plan['emoji']} {plan['label']} — KSH {plan['price']:,}\n"
+        f"Expires: {expiry.strftime('%d %B %Y')}",
+        parse_mode="Markdown"
     )
-    for admin_id in config.ADMIN_IDS:
-        try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=f"💰 New subscriber!\n"
-                     f"👤 {user.first_name} (@{user.username or 'no username'})\n"
-                     f"📋 {plan['label']} — KSH {plan['price']:,}\n"
-                     f"📱 {phone}\n"
-                     f"📅 Expires: {expiry.strftime('%d %B %Y')}"
-            )
-        except Exception:
-            pass
-    context.user_data.clear()
-    return ConversationHandler.END
+
+
+async def cb_admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if update.effective_user.id not in config.ADMIN_IDS:
+        await query.answer("❌ Huna ruhusa!", show_alert=True)
+        return
+
+    # callback_data format: reject_USERID
+    parts = query.data.split("_", 1)
+    user_id = int(parts[1])
+
+    try:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text="❌ *Payment haikukonfirmiwa.*\n\n"
+                 "Tafadhali hakikisha:\n"
+                 "• Umelipa kiasi sahihi\n"
+                 "• Umetumia Till Number iliyo sahihi\n"
+                 "• M-Pesa message ya kuthibitisha ilikuja\n\n"
+                 "Jaribu tena au wasiliana na admin.\n"
+                 "Type /start kuanza upya. 🙏",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"Could not notify user {user_id} of rejection: {e}")
+
+    await query.edit_message_text(
+        f"❌ *Rejected.*\n\nUser `{user_id}` amearifiwa.",
+        parse_mode="Markdown"
+    )
+
+
+# ──────────────────────────────────────────
+# OTHER CALLBACKS
+# ──────────────────────────────────────────
 
 async def cb_random_story(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -278,6 +434,11 @@ async def cb_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await query.edit_message_text("Sawa! Type /start unapotaka kuendelea.")
     return ConversationHandler.END
+
+
+# ──────────────────────────────────────────
+# SCHEDULED JOBS
+# ──────────────────────────────────────────
 
 async def job_auto_post(context: ContextTypes.DEFAULT_TYPE):
     global _category_index
@@ -325,6 +486,11 @@ async def job_check_subs(context: ContextTypes.DEFAULT_TYPE):
             pass
         db.deactivate_subscriber(sub["user_id"])
 
+
+# ──────────────────────────────────────────
+# STARTUP & MAIN
+# ──────────────────────────────────────────
+
 async def post_init(application: Application):
     await application.bot.set_my_commands([
         BotCommand("start", "Karibu Velcavs!"),
@@ -339,9 +505,11 @@ async def post_init(application: Application):
     job_queue.run_repeating(job_check_subs, interval=3600, first=60)
     logger.info("Velcavs bot running! Stories every 3h, Promos every 1.5h")
 
+
 def main():
     db.init_db()
     app = Application.builder().token(config.BOT_TOKEN).post_init(post_init).build()
+
     conv = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(cb_join_premium, pattern="^join_premium$"),
@@ -368,6 +536,7 @@ def main():
         per_chat=True,
         allow_reentry=True,
     )
+
     app.add_handler(conv)
     app.add_handler(CommandHandler("story", cmd_story))
     app.add_handler(CommandHandler("status", cmd_status))
@@ -377,11 +546,18 @@ def main():
     app.add_handler(CommandHandler("post", cmd_post))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(CallbackQueryHandler(cb_random_story, pattern="^random_story$"))
+
+    # Admin approval handlers — registered outside ConversationHandler
+    app.add_handler(CallbackQueryHandler(cb_admin_approve, pattern="^approve_"))
+    app.add_handler(CallbackQueryHandler(cb_admin_reject, pattern="^reject_"))
+
     threading.Thread(
         target=lambda: server.run(host='0.0.0.0', port=8080),
         daemon=True
     ).start()
-    app.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
+
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True, stop_signals=None)
+
 
 if __name__ == "__main__":
     main()
